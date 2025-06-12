@@ -2,7 +2,7 @@
 
 ### Installation
 1. Make sure Python3 (>=3.13) is installed
-2. `pip3 install requirements.txt`
+2. `pip3 install -r requirements.txt`
 3. Execute `./napass` shell script
 
 ### Quick start
