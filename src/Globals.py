@@ -2,7 +2,7 @@
 
 Globals = {
     "enc_filename": "",
-    "password": "",
+    "vault_password": "",
 }
 
 def GET(g: str) -> str:

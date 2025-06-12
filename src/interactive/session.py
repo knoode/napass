@@ -1,5 +1,6 @@
 # interactive/session.py
 
+from getpass import getpass
 import pyperclip
 import readline
 import os
@@ -20,7 +21,7 @@ art = """
 
 """
 
-def start_session(data: dict):
+def start_session(data: dict, metadata: dict):
     # Clear the screen
     if sys.platform == "linux":
         os.system("clear")
@@ -32,13 +33,13 @@ def start_session(data: dict):
     print("To quit press Ctrl+D or type 'exit'")
     print()
 
-    session_loop(data)
+    session_loop(data, metadata)
     
     data.clear()
 
     print("Exit.")
 
-def session_loop(data: dict):
+def session_loop(data: dict, metadata: dict):
     running = True
 
     while running:
@@ -52,9 +53,9 @@ def session_loop(data: dict):
             continue
         
         if command:
-            running = execute_command(command, data)
+            running = execute_command(command, data, metadata)
 
-def execute_command(command: str, data: dict) -> bool:
+def execute_command(command: str, data: dict, metadata: dict) -> bool:
     running = True
 
     parts = command.split()
@@ -75,7 +76,7 @@ def execute_command(command: str, data: dict) -> bool:
                         pyperclip.copy(secret)
                         print("Copied to clipboard!")
                     else:
-                        print("grab: No such field '%s'" % field)
+                        print("grab: No such field '%s.%s'" % (entry, field))
                 else:
                     print("grab: No such entry '%s'" % entry)
             else:
@@ -84,7 +85,7 @@ def execute_command(command: str, data: dict) -> bool:
             print("grab: Takes 1 argument")
     
     elif action == "add":
-        if len(parts) == 3:
+        if len(parts) == 3 or len(parts) == 4:
             add_type = parts[1]
 
             if add_type == "entry":
@@ -92,7 +93,7 @@ def execute_command(command: str, data: dict) -> bool:
 
                 if parser.match_single(new_entry):
                     if new_entry not in data.keys():
-                        cmd.add_entry(data, new_entry)
+                        cmd.add_entry(data, metadata, new_entry)
                         print("Added entry '%s'" % new_entry)
                     else:
                         print("add entry: Entry '%s' already exists" % new_entry)
@@ -100,17 +101,29 @@ def execute_command(command: str, data: dict) -> bool:
                     print("add entry: Format must include only alphabetic symbols")
                     
             elif add_type == "field":
-                arg = parts[2]
-                entry, new_field = parser.sep_pair(arg)
+                if len(parts) == 4:
+                    hidden = parts[2] == "x"
+                    couple = parts[3]
+                else:
+                    hidden = False
+                    couple = parts[2]
+                
+                entry, new_field = parser.sep_pair(couple)
 
                 if entry and new_field:
                     if entry in data.keys():
                         if new_field not in data[entry].keys():
-                            text = input("Text: ")
+                            if hidden:
+                                text = getpass("Text: ").strip()
+                            else:
+                                text = input("Text: ").strip()
+
+                            metadata[entry][new_field] = { "hidden": hidden }
+
                             cmd.add_field(data, entry, new_field, text)
-                            print("Added field '%s'" % new_field)
+                            print("Added field '%s.%s'" % (entry, new_field))
                         else:
-                            print("add field: Field '%s' already exists" % new_field)
+                            print("add field: Field '%s.%s' already exists" % (entry, new_field))
                     else:
                         print("add field: No such entry '%s'" % entry)
                 else:
@@ -118,28 +131,64 @@ def execute_command(command: str, data: dict) -> bool:
             else:
                 print("add: Use 'add entry', or 'add field'")
         else:
-            print("add: Takes 2 arguments")
+            print("add: Takes at least 2 arguments")
+    
+    elif action == "remove":
+        if len(parts) == 3:
+            remove_type = parts[1]
+
+            if remove_type == "entry":
+                entry = parts[2]
+
+                if parser.match_single(entry):
+                    if entry in data.keys():
+                        cmd.remove_entry(data, entry)
+                        print("Entry '%s' removed!" % entry)
+                    else:
+                        print("remove entry: No such entry '%s'" % entry)
+                else:
+                    print("remove entry: Format must include only alphabetic symbols")
+            
+            elif remove_type == "field":
+                entry, field = parser.sep_pair(parts[2])
+
+                if entry and field:
+                    if entry in data.keys():
+                        if field in data[entry].keys():
+                            cmd.remove_field(data, entry, field)
+                            print("Field '%s.%s' removed!" % (entry, field))
+                        else:
+                            print("remove field: No such field '%s.%s'" % (entry, field))
+                    else:
+                        print("remove field: No such entry '%s'" % entry)
+                else:
+                    print("remove field: Format must be 'entry.field' and only alphabetic symbols")
+        else:
+            print("remove: Takes at least 2 arguments")
     
     elif action == "save":
         if data:
-            cmd.save(data)
+            cmd.save(data, metadata)
             print("Vault saved!")
         else:
             print("save: Vault is empty")
 
     elif action == "reveal":
-        if len(parts) >= 2:
+        if len(parts) in (2, 3):
             reveal_type = parts[1]
 
             if reveal_type == "all":
-                toml_data = cmd.reveal_all(data)
+                toml_data = cmd.reveal_all(data, metadata)
                 print(toml_data if toml_data else "()")
 
             elif reveal_type == "entry":
                 if len(parts) == 3:
                     entry = parts[2]
-                    toml_data = cmd.reveal_entry(data, entry)
-                    print(toml_data if toml_data else "()")
+                    if entry in data.keys():
+                        toml_data = cmd.reveal_entry(data, metadata, entry)
+                        print(toml_data if toml_data else "()")
+                    else:
+                        print("reveal entry: No such entry '%s'" % entry)
                 else:
                     print("reveal entry: Entry argument not specified")
 
@@ -151,8 +200,8 @@ def execute_command(command: str, data: dict) -> bool:
                     if entry and field:
                         if entry in data.keys():
                             if field in data[entry].keys():
-                                text = cmd.reveal_field(data, entry, field)
-                                print(text if text else "()")
+                                text = cmd.reveal_field(data, metadata, entry, field)
+                                print(text)
                             else:
                                 print("reveal field: No such field '%s'" % field)
                         else:

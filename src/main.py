@@ -3,78 +3,75 @@
 import time
 import sys
 from argparse import ArgumentParser
-from getpass import getpass
 
 import Globals
 from crypto import crypto
 from interactive import session
+from interactive import parser
 
 def main():
-    parser = ArgumentParser(
+    argparser = ArgumentParser(
         prog="napass",
     )
     
-    subparser = parser.add_subparsers(dest="command", required=True)
-    init_parser = subparser.add_parser("init", help="Initialize a new vault")
+    subparser = argparser.add_subparsers(dest="command", required=True)
+    subparser.add_parser("init", help="Initialize a new vault")
     login_parser = subparser.add_parser("login", help="Log in into vault")
     login_parser.add_argument("file", help="Path to encrypted TOML file")
 
-    # TODO: Add -d flag
-
-    args = parser.parse_args()
+    args = argparser.parse_args()
 
     match args.command:
         case "init":
-            try:
-                vault_name = input("(?) Vault name: ").strip()
-                vault_pwd = getpass("(?) Password: ").strip()
+            vault_name = parser.safe_input("[1] Vault name: ")
 
-            except (KeyboardInterrupt, EOFError):
-                print()
-                safe_sleep(0.89)
-                sys.exit(0)
+            if not vault_name:
+                print("(!) You must enter vault name", file=sys.stderr)
+                parser.safe_sleep(.89)
+                sys.exit(1)
 
+            vault_pwd = parser.safe_input("[2] Password: ", hidden=True)
+                
+            if not vault_pwd:
+                print("(!) You must enter vault password", file=sys.stderr)
+                parser.safe_sleep(.89)
+                sys.exit(1)
+            
             enc_filename = vault_name + ".enc"
 
             Globals.SET("enc_filename", enc_filename)
-            Globals.SET("password", vault_pwd)
+            Globals.SET("vault_password", vault_pwd)
 
             print("(*) Creating a new vault '%s'" % vault_name)
             time.sleep(2.5)
             
-            data = {}
-            session.start_session(data)
+            data, metadata = {}, {}
+            session.start_session(data, metadata)
 
         case "login":
             enc_file = args.file
             Globals.SET("enc_filename", enc_file)
             
             # TODO: Add name for vaults, stored in prefix to key
-            try:
-                password = getpass("(?) Password: ")
-            except (EOFError, KeyboardInterrupt):
-                sys.exit(0)
+            vault_pwd = parser.safe_input("Password: ", hidden=True)
 
-            print("(*) Decrypting in progress...")
-            time.sleep(2.5)
+            if vault_pwd:
+                print("(*) Decrypting...")
+                parser.safe_sleep(.89)
 
-            data = crypto.decrypt_toml(password, enc_file)
+                data, metadata = crypto.decrypt_toml(vault_pwd, enc_file)
 
-            if not data:
-                print("(^!^) Wrong vault password")
-                sys.exit(1)
-            else:
-                Globals.SET("password", password)
-                session.start_session(data)
+                if not data and not metadata:
+                    print("(^!^) Wrong vault password")
+                    sys.exit(1)
+                else:
+                    Globals.SET("vault_password", vault_pwd)
+                    session.start_session(data, metadata)
 
         case _:
             pass
 
-def safe_sleep(seconds: int):
-    try:
-        time.sleep(seconds)
-    except KeyboardInterrupt:
-        pass
+
 
 if __name__ == "__main__":
     main()
