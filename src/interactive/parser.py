@@ -49,3 +49,43 @@ def unwrap_metadata(data: dict, metadata: dict) -> dict:
                     result[section][field] = text
         
     return result
+
+def decode_to_str(field: list[int]) -> str:
+    if field:
+        decoded = [ chr(i) for i in field ]
+        return ''.join(decoded)
+    else:
+        return ""
+
+def decode_str_update(data: dict) -> dict:
+    if data:
+        decoded_data = {}
+
+        for entry, field in data.items():
+            decoded_data[entry] = {}
+
+            if field:
+                for k,v in field.items():
+                    decoded_data[entry][k] = decode_to_str(v)
+            else:
+                decoded_data[entry] = {}
+
+        return decoded_data
+    else:
+        return {}
+
+def into_toml(data: dict) -> str:
+    toml_string = ""
+
+    for section, fields in data.items():
+        for field, value in fields.items():
+            if isinstance(value, dict):
+                toml_string += "[%s.%s]\n" % (section, field)
+
+                for k,v in value.items():
+                    toml_string += f'{k} = "{v}"'
+            else:
+                toml_string += "[%s]\n" % section
+                toml_string += f'{field} = "{value}"\n'
+    
+    return toml_string

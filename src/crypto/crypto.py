@@ -9,6 +9,8 @@ from cryptography.fernet import Fernet
 from cryptography.fernet import InvalidToken
 from typing import Tuple
 
+from interactive import parser
+
 def generate_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -20,19 +22,21 @@ def generate_key(password: str, salt: bytes) -> bytes:
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def encrypt_toml(data: dict, metadata: dict, password: str, output_file: str):
+
     salt = os.urandom(16)
     key = generate_key(password, salt)
     fernet = Fernet(key)
 
-    data_dump = toml.dumps(data)
-    metadata_dump = toml.dumps(metadata)
+    data_toml = toml.dumps(data)
+    metadata_toml = toml.dumps(metadata)
 
-    encrypted = fernet.encrypt(
-        data_dump.encode() + b"\x00" + metadata_dump.encode()
-    )
+    data_enc = base64.urlsafe_b64encode(fernet.encrypt(data_toml.encode()))
+    metadata_enc = base64.urlsafe_b64encode(fernet.encrypt(metadata_toml.encode()))
+    encrypted = data_enc + b'\x00' + metadata_enc
 
     with open(output_file, "wb") as f:
         f.write(salt + encrypted)
+    
 
 def decrypt_toml(password: str, input_file: str) -> Tuple[dict, dict]:
     with open(input_file, "rb") as f:
@@ -44,12 +48,16 @@ def decrypt_toml(password: str, input_file: str) -> Tuple[dict, dict]:
     key = generate_key(password, salt)
     fernet = Fernet(key)
 
-    try:
-        decrypted = fernet.decrypt(encrypted).split(b"\x00")
+    enc_parts = encrypted.split(b'\x00')
 
-        if len(decrypted) == 2:
-            data = toml.loads(decrypted[0].decode())
-            metadata = toml.loads(decrypted[1].decode())
+    try:
+        if len(enc_parts) == 2:
+            data_toml = fernet.decrypt(base64.urlsafe_b64decode(enc_parts[0])).decode()
+            metadata_toml = fernet.decrypt(base64.urlsafe_b64decode(enc_parts[1])).decode()
+
+            data, metadata = toml.loads(data_toml), toml.loads(metadata_toml)
+            # print(data, metadata)
+            # os.system("read")
 
             return (data, metadata)
         else:

@@ -21,15 +21,17 @@ def help():
 
 def reveal_all(data: dict, metadata: dict) -> str:
     if data and metadata:
+        decoded_data = parser.decode_str_update(data)
         return toml.dumps(
-            parser.unwrap_metadata(data, metadata)
+            parser.unwrap_metadata(decoded_data, metadata)
         )
     else:
         return ""
 
 def reveal_entry(data: dict, metadata: dict, entry: str) -> str:
     if data and metadata and entry:
-        unwrap_data = parser.unwrap_metadata(data, metadata)
+        decoded_data = parser.decode_str_update(data)
+        unwrap_data = parser.unwrap_metadata(decoded_data, metadata)
 
         return toml.dumps(
             unwrap_data.get(entry)
@@ -38,11 +40,11 @@ def reveal_entry(data: dict, metadata: dict, entry: str) -> str:
         return ""
 
 def reveal_field(data: dict, metadata: dict, entry: str, field: str) -> str:
-    unwrap_data = parser.unwrap_metadata(data, metadata)
-
-    return grab(
-        unwrap_data, entry, field
-    )
+    if data and metadata and entry and field:
+        decoded_data = parser.decode_str_update(data)
+        return parser.unwrap_metadata(decoded_data, metadata).get(entry).get(field)
+    else:
+        return ""
 
 def add_entry(data: dict, metadata: dict, entry: str) -> str:
     if entry:
@@ -52,10 +54,10 @@ def add_entry(data: dict, metadata: dict, entry: str) -> str:
     else:
         return ""
 
-def add_field(data: dict, entry: str, field: str, text: str) -> str:
+def add_field(data: dict, metadata: dict, entry: str, field: str, text: str, hidden: bool = False) -> str:
     if entry and field and text:
-        data[entry][field] = text
-        return text
+        data[entry][field] = text.encode()
+        metadata[entry][field] = { "hidden": hidden }
     else:
         return ""
 
@@ -73,9 +75,9 @@ def remove_field(data: dict, entry: str, field: str) -> str:
     else:
         return ""
 
-def grab(data: dict, entry: str, field: str) -> str:
+def grab(data: dict, entry: list[int], field: str) -> str:
     if data and entry and field:
-        return data[entry][field]
+        return parser.decode_to_str(data.get(entry).get(field))
     else:
         return ""
 
