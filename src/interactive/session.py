@@ -33,10 +33,8 @@ def start_session(data: dict, metadata: dict):
     print("To quit press Ctrl+D or type 'exit'")
     print()
 
-    # print(data)
-    # os.system("read")
     session_loop(data, metadata)
-
+    
     data.clear()
 
     print("Exit.")
@@ -87,7 +85,7 @@ def execute_command(command: str, data: dict, metadata: dict) -> bool:
             print("grab: Takes 1 argument")
     
     elif action == "add":
-        if len(parts) in (3, 4):
+        if len(parts) == 3 or len(parts) == 4:
             add_type = parts[1]
 
             if add_type == "entry":
@@ -115,13 +113,8 @@ def execute_command(command: str, data: dict, metadata: dict) -> bool:
                 if entry and new_field:
                     if entry in data.keys():
                         if new_field not in data[entry].keys():
-                            if hidden:
-                                text = parser.safe_input("Text: ", hidden=True)
-                            else:
-                                text = parser.safe_input("Text: ")
-
-                            cmd.add_field(data, metadata, entry, new_field, text, hidden)
-
+                            text = parser.safe_input("Text: ", hidden=hidden)
+                            cmd.add_field(data, metadata, entry, new_field, text, hidden=hidden)
                             print("Added field '%s.%s'" % (entry, new_field))
                         else:
                             print("add field: Field '%s.%s' already exists" % (entry, new_field))

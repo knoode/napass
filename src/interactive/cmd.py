@@ -42,7 +42,8 @@ def reveal_entry(data: dict, metadata: dict, entry: str) -> str:
 def reveal_field(data: dict, metadata: dict, entry: str, field: str) -> str:
     if data and metadata and entry and field:
         decoded_data = parser.decode_str_update(data)
-        return parser.unwrap_metadata(decoded_data, metadata).get(entry).get(field)
+        unwrap_data = parser.unwrap_metadata(decoded_data, metadata)
+        return unwrap_data.get(entry).get(field)
     else:
         return ""
 
@@ -58,24 +59,27 @@ def add_field(data: dict, metadata: dict, entry: str, field: str, text: str, hid
     if entry and field and text:
         data[entry][field] = text.encode()
         metadata[entry][field] = { "hidden": hidden }
+        return text
     else:
         return ""
 
-def remove_entry(data: dict, entry: str) -> str:
-    if data and entry:
+def remove_entry(data: dict, metadata: dict, entry: str) -> str:
+    if data and metadata and entry:
         del data[entry]
+        del metadata[entry]
         return entry
     else:
         return ""
 
-def remove_field(data: dict, entry: str, field: str) -> str:
-    if data and entry and field:
+def remove_field(data: dict, metadata: dict, entry: str, field: str) -> str:
+    if data and metadata and entry and field:
         del data[entry][field]
+        del metadata[entry][field]
         return field
     else:
         return ""
 
-def grab(data: dict, entry: list[int], field: str) -> str:
+def grab(data: dict, entry: str, field: str) -> str:
     if data and entry and field:
         return parser.decode_to_str(data.get(entry).get(field))
     else:

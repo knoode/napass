@@ -9,8 +9,6 @@ from cryptography.fernet import Fernet
 from cryptography.fernet import InvalidToken
 from typing import Tuple
 
-from interactive import parser
-
 def generate_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -22,44 +20,40 @@ def generate_key(password: str, salt: bytes) -> bytes:
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def encrypt_toml(data: dict, metadata: dict, password: str, output_file: str):
-
     salt = os.urandom(16)
     key = generate_key(password, salt)
     fernet = Fernet(key)
 
-    data_toml = toml.dumps(data)
-    metadata_toml = toml.dumps(metadata)
-
-    data_enc = base64.urlsafe_b64encode(fernet.encrypt(data_toml.encode()))
-    metadata_enc = base64.urlsafe_b64encode(fernet.encrypt(metadata_toml.encode()))
-    encrypted = data_enc + b'\x00' + metadata_enc
+    data_enc = fernet.encrypt(toml.dumps(data).encode())
+    metadata_enc = fernet.encrypt(toml.dumps(metadata).encode())
+    encrypted = base64.urlsafe_b64encode(data_enc) + b'\x00' + base64.urlsafe_b64encode(metadata_enc)
 
     with open(output_file, "wb") as f:
         f.write(salt + encrypted)
-    
 
 def decrypt_toml(password: str, input_file: str) -> Tuple[dict, dict]:
     with open(input_file, "rb") as f:
         text = f.read()
     
     salt = text[:16]
-    encrypted = text[16:]
-
     key = generate_key(password, salt)
     fernet = Fernet(key)
 
-    enc_parts = encrypted.split(b'\x00')
+    encrypted = text[16:].split(b'\x00')
 
     try:
-        if len(enc_parts) == 2:
-            data_toml = fernet.decrypt(base64.urlsafe_b64decode(enc_parts[0])).decode()
-            metadata_toml = fernet.decrypt(base64.urlsafe_b64decode(enc_parts[1])).decode()
+        if len(encrypted) == 2:
+            data_part = encrypted[0]
+            metadata_part = encrypted[1]
 
-            data, metadata = toml.loads(data_toml), toml.loads(metadata_toml)
-            # print(data, metadata)
-            # os.system("read")
+            data_dec = fernet.decrypt(base64.urlsafe_b64decode(data_part.decode()))
+            metadata_dec = fernet.decrypt(base64.urlsafe_b64decode(metadata_part.decode()))
+
+            data = toml.loads(data_dec.decode())
+            metadata = toml.loads(metadata_dec.decode())
 
             return (data, metadata)
+
         else:
             return {}, {}
 
